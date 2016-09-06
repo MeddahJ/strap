@@ -47,7 +47,7 @@ else
 fi
 
 
-json_value() { # because jQ is probably not available at this time
+json_value() { # jq won't be available the first time
     JSON=$1
     KEY=$2
     echo $JSON | python -c 'import sys, json; print json.load(sys.stdin)[sys.argv[1]]' $KEY 2>/dev/null || true
@@ -56,14 +56,27 @@ json_value() { # because jQ is probably not available at this time
 STDIN_FILE_DESCRIPTOR="0"
 [ -t "$STDIN_FILE_DESCRIPTOR" ] && STRAP_INTERACTIVE="1"
 
-STRAP_GITHUB_USER="MeddahJ"
-STRAP_GITHUB_TOKEN="4dd79300a0cf7317ef8fdfb8c75cd0fdd69cecf5"
+# STRAP_GITHUB_USER="MeddahJ"
+# STRAP_GITHUB_TOKEN="4dd79300a0cf7317ef8fdfb8c75cd0fdd69cecf5"
 STRAP_ISSUES_URL="https://github.com/MeddahJ/strap/issues/new"
 
 STRAP_FULL_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 
+github_authentication () {
+    USER=$1
+    PASSWORD=$2
+    TFA_CODE=$3
 
-# if [ -z $STRAP_GITHUB_USER -o -z $STRAP_GITHUB_TOKEN] ; then
+    curl -s -u "$USER:$PASSWORD" `[ -n $TFA_CODE] && echo "-H \"X-GitHub-OTP:$TFA_CODE\""` "https://api.github.com/authorizations" -d "{
+      \"scopes\": [
+        \"write:public_key\",
+        \"user:email\",
+        \"repo\"
+      ],
+      \"note\": \"$USER@$(hostname -s) on $(date)\"
+    }"
+}
+
 if [ -z "$STRAP_GITHUB_USER" ] || [ -z "$STRAP_GITHUB_TOKEN" ] ; then
     echo -n "Github Username:"
     read STRAP_GITHUB_USER
@@ -72,14 +85,7 @@ if [ -z "$STRAP_GITHUB_USER" ] || [ -z "$STRAP_GITHUB_TOKEN" ] ; then
     read -s STRAP_GITHUB_PASSWORD
     echo
 
-    AUTH_RESPONSE=$(curl -s -u "$STRAP_GITHUB_USER:$STRAP_GITHUB_PASSWORD" "https://api.github.com/authorizations" -d "{
-      \"scopes\": [
-        \"write:public_key\",
-        \"user:email\",
-        \"repo\"
-      ],
-      \"note\": \"[$(hostname -s)] Read user data, write public keys, administer repos (`date`)\"
-    }")
+    AUTH_RESPONSE=$(github_authentication $STRAP_GITHUB_USER $STRAP_GITHUB_PASSWORD)
 
     MESSAGE=`json_value "$AUTH_RESPONSE" message`
 
@@ -93,20 +99,14 @@ if [ -z "$STRAP_GITHUB_USER" ] || [ -z "$STRAP_GITHUB_TOKEN" ] ; then
         read -s STRAP_GITHUB_2FA_CODE
         echo
 
-        AUTH_RESPONSE=$(curl -s -u "$STRAP_GITHUB_USER:$STRAP_GITHUB_PASSWORD" -H "X-GitHub-OTP:$STRAP_GITHUB_2FA_CODE" "https://api.github.com/authorizations" -d "{
-          \"scopes\": [
-            \"write:public_key\",
-            \"user:email\",
-            \"repo\"
-          ],
-          \"note\": \"[$(hostname -s)] Read user data, write public keys, administer repos (`date`)\"
-        }")
+        AUTH_RESPONSE=$(github_authentication $STRAP_GITHUB_USER $STRAP_GITHUB_PASSWORD $STRAP_GITHUB_2FA_CODE)
 
         MESSAGE=`json_value "$AUTH_RESPONSE" message`
+
         # if [ "$MESSAGE" = "Bad credentials" ] #todo: while loop
         if [ "$MESSAGE" = "Must specify two-factor authentication OTP code." ]
         then
-            echo "Invalid 2FA credentials for user $STRAP_GITHUB_USER"
+            echo "Invalid 2FA code for user $STRAP_GITHUB_USER"
             exit 1
         fi
     fi
@@ -151,32 +151,8 @@ sw_vers -productVersion | grep $Q -E "^10.(9|10|11|12)" || abort "Run Strap on M
 
 IS_ADMIN="`groups | grep admin | wc -l`"
 
-STRAP_SUCCESS="1"
-exit 0
-
-# Move to .defaults
-#
-# # Set some basic security settings.
-# logn "Configuring security settings:"
-# defaults write com.apple.Safari \
-#   com.apple.Safari.ContentPageGroupIdentifier.WebKit2JavaEnabled \
-#   -bool false
-# defaults write com.apple.Safari \
-#   com.apple.Safari.ContentPageGroupIdentifier.WebKit2JavaEnabledForLocalFiles \
-#   -bool false
-# defaults write com.apple.screensaver askForPassword -int 1
-# defaults write com.apple.screensaver askForPasswordDelay -int 0
-# sudo defaults write /Library/Preferences/com.apple.alf globalstate -int 1
-# sudo launchctl load /System/Library/LaunchDaemons/com.apple.alf.agent.plist 2>/dev/null
-
-# No thanks
-#
-# if [ -n "$STRAP_GIT_NAME" ] && [ -n "$STRAP_GIT_EMAIL" ]; then
-#   sudo defaults write /Library/Preferences/com.apple.loginwindow \
-#     LoginwindowText \
-#     "Found this computer? Please contact $STRAP_GIT_NAME at $STRAP_GIT_EMAIL."
-# fi
-# logk
+# STRAP_SUCCESS="1"
+# exit 0
 
 
 function when_admin() {
@@ -313,35 +289,7 @@ log "Updating Homebrew:"
 brew update
 logk
 
-# Install Homebrew Bundle, Cask, Services and Versions tap.
-log "Installing Homebrew taps and extensions:"
-brew bundle --file=- <<EOF
-tap 'caskroom/cask'
-tap 'homebrew/core'
-tap 'homebrew/services'
-tap 'homebrew/versions'
-EOF
-logk
 
-# Best to install from local Brewfile
-#
-# if [ -n "$STRAP_GITHUB_USER" ]; then
-#   REPO_URL="https://github.com/$STRAP_GITHUB_USER/homebrew-brewfile"
-#   REPO_API_URL="https://api.github.com/repos/$STRAP_GITHUB_USER/homebrew-brewfile"
-#   STATUS_CODE=$(curl -u "$STRAP_GITHUB_USER:$STRAP_GITHUB_TOKEN" --silent --write-out "%{http_code}" --output /dev/null $REPO_API_URL/contents/Brewfile)
-#
-#   if [ "$STATUS_CODE" -eq 200 ]; then
-#     logn "Fetching user Brewfile from GitHub:"
-#     if [ ! -d "$HOME/.homebrew-brewfile" ]; then
-#       git clone $Q $REPO_URL ~/.homebrew-brewfile
-#     else
-#       cd ~/.homebrew-brewfile
-#       git pull $Q
-#     fi
-#     ln -sf ~/.homebrew-brewfile/Brewfile ~/.Brewfile
-#     logk
-#   fi
-# fi
 
 # Install from local Brewfile
 if [ -f "$HOME/.Brewfile" ]; then
@@ -349,6 +297,25 @@ if [ -f "$HOME/.Brewfile" ]; then
   brew bundle --global
   logk
 fi
+
+if ! [ -d "$HOME/.library" ] ; then
+  git clone git@github.com:MeddahJ/osx-library.git "$HOME/.library"
+  rsync -a "$HOME/.library" "$HOME/Library"
+else
+  git pull origin master
+  # TODO: implement automatic sync between library files
+fi
+
+
+if ! [ -d "$HOME/.dotfiles" ] ; then
+  git clone git@github.com:MeddahJ/dotfiles.git "$HOME/.dotfiles"
+else
+  git pull origin master
+  # TODO: implement automatic sync between library files
+fi
+ls -d "$HOME/.dotfiles/.*" | xargs -I dotfile ln -fs dotfile $HOME/dotfile
+
+
 
 if [ $IS_ADMIN = 1 ] ; then
     # Check and install any remaining software updates.
@@ -359,12 +326,12 @@ if [ $IS_ADMIN = 1 ] ; then
       echo
       log "Installing software updates:"
 
-        sudo softwareupdate -l | grep "*" -A1 | sed -e'2N;$!N;/\n.*restart.*/!P;D' | sed -n "s/^.*\* //p" | xargs softwareupdate -i
+        sudo softwareupdate -l | grep "*" -A1 | sed -e'2N;$!N;/\n.*restart.*/!P;D' | sed -n "s/^.*\* //p" | xargs -I app softwareupdate -i "app"
         #   sudo softwareupdate --install --all
-        #   xcode_license
+        xcode_license
       logk
     fi
 fi
 
 STRAP_SUCCESS="1"
-log "Your system is now Strap'd!"
+log "Bootstrap done"
