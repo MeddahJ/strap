@@ -67,7 +67,7 @@ github_authentication () {
     PASSWORD=$2
     TFA_CODE=$3
 
-    curl -s -u "$USER:$PASSWORD" `[ -n $TFA_CODE] && echo "-H \"X-GitHub-OTP:$TFA_CODE\""` "https://api.github.com/authorizations" -d "{
+    curl -s -u "$USER:$PASSWORD" `[ -n $TFA_CODE ] && echo "-H \"X-GitHub-OTP:$TFA_CODE\""` "https://api.github.com/authorizations" -d "{
       \"scopes\": [
         \"write:public_key\",
         \"user:email\",
@@ -88,6 +88,8 @@ if [ -z "$STRAP_GITHUB_USER" ] || [ -z "$STRAP_GITHUB_TOKEN" ] ; then
     AUTH_RESPONSE=$(github_authentication $STRAP_GITHUB_USER $STRAP_GITHUB_PASSWORD)
 
     MESSAGE=`json_value "$AUTH_RESPONSE" message`
+
+    echo "$AUTH_RESPONSE"
 
     if [ "$MESSAGE" = "Bad credentials" ]
     then
@@ -117,7 +119,8 @@ if [ -z "$STRAP_GITHUB_USER" ] || [ -z "$STRAP_GITHUB_TOKEN" ] ; then
     # echo $AUTH_RESPONSE
     STRAP_GITHUB_TOKEN=`json_value "$AUTH_RESPONSE" token`
 
-    # echo $STRAP_GITHUB_TOKEN
+    echo $STRAP_GITHUB_TOKEN
+
 fi
 
 # # Todo: rm public key token with exact name if exists
