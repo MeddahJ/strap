@@ -67,7 +67,7 @@ github_authentication () {
     PASSWORD=$2
     TFA_CODE=$3
 
-    curl -s -u "$USER:$PASSWORD" `[[ -n $TFA_CODE ]] && echo "-H \"X-GitHub-OTP:$TFA_CODE\""` "https://api.github.com/authorizations" -d "{
+    curl -s -u "$USER:$PASSWORD" -H "X-GitHub-OTP:$TFA_CODE" "https://api.github.com/authorizations" -d "{
       \"scopes\": [
         \"write:public_key\",
         \"user:email\",
@@ -89,8 +89,6 @@ if [ -z "$STRAP_GITHUB_USER" ] || [ -z "$STRAP_GITHUB_TOKEN" ] ; then
 
     MESSAGE=`json_value "$AUTH_RESPONSE" message`
 
-    echo "$AUTH_RESPONSE"
-
     if [ "$MESSAGE" = "Bad credentials" ]
     then
         echo "Invalid credentials for user $STRAP_GITHUB_USER"
@@ -102,6 +100,8 @@ if [ -z "$STRAP_GITHUB_USER" ] || [ -z "$STRAP_GITHUB_TOKEN" ] ; then
         echo
 
         AUTH_RESPONSE=$(github_authentication $STRAP_GITHUB_USER $STRAP_GITHUB_PASSWORD $STRAP_GITHUB_2FA_CODE)
+
+        echo $AUTH_RESPONSE
 
         MESSAGE=`json_value "$AUTH_RESPONSE" message`
 
@@ -116,10 +116,10 @@ if [ -z "$STRAP_GITHUB_USER" ] || [ -z "$STRAP_GITHUB_TOKEN" ] ; then
     unset STRAP_GITHUB_PASSWORD
     unset STRAP_GITHUB_2FA_CODE
 
-    # echo $AUTH_RESPONSE
+    echo "2FA response: " $AUTH_RESPONSE
     STRAP_GITHUB_TOKEN=`json_value "$AUTH_RESPONSE" token`
 
-    echo $STRAP_GITHUB_TOKEN
+    echo "Token: " $STRAP_GITHUB_TOKEN
 
 fi
 
