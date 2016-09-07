@@ -67,7 +67,7 @@ github_authentication () {
     PASSWORD=$2
     TFA_CODE=$3
 
-    curl -s -u "$USER:$PASSWORD" `[ -n $TFA_CODE ] && echo "-H \"X-GitHub-OTP:$TFA_CODE\""` "https://api.github.com/authorizations" -d "{
+    curl -s -u "$USER:$PASSWORD" `[[ -n $TFA_CODE ]] && echo "-H \"X-GitHub-OTP:$TFA_CODE\""` "https://api.github.com/authorizations" -d "{
       \"scopes\": [
         \"write:public_key\",
         \"user:email\",
