@@ -266,7 +266,7 @@ then
 fi
 logk
 
-if ! [ -x `which brew` ] ; then
+if ! [[ -x `which brew` ]] ; then
     # Setup Homebrew directory and permissions.
     logn "Installing Homebrew:"
 
