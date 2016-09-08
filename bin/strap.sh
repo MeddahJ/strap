@@ -56,8 +56,6 @@ json_value() { # jq won't be available the first time
 STDIN_FILE_DESCRIPTOR="0"
 [ -t "$STDIN_FILE_DESCRIPTOR" ] && STRAP_INTERACTIVE="1"
 
-# STRAP_GITHUB_USER="MeddahJ"
-# STRAP_GITHUB_TOKEN="4dd79300a0cf7317ef8fdfb8c75cd0fdd69cecf5"
 STRAP_ISSUES_URL="https://github.com/MeddahJ/strap/issues/new"
 
 STRAP_FULL_PATH="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
@@ -77,7 +75,9 @@ github_authentication () {
     }"
 }
 
-if [ -z "$STRAP_GITHUB_USER" ] || [ -z "$STRAP_GITHUB_TOKEN" ] ; then
+PRIVATE_KEY_PATH="$HOME/.ssh/github_rsa"
+
+if ! [ -f "$PRIVATE_KEY_PATH" ]; then
     echo -n "Github Username:"
     read STRAP_GITHUB_USER
 
@@ -121,24 +121,16 @@ if [ -z "$STRAP_GITHUB_USER" ] || [ -z "$STRAP_GITHUB_TOKEN" ] ; then
 
     echo "Token: " $STRAP_GITHUB_TOKEN
 
+
+    ssh-keygen -t rsa -b 4096 -C "github.com/$STRAP_GITHUB_USER" -N "" -f $PRIVATE_KEY_PATH -q
+
+    curl -s -u "$STRAP_GITHUB_USER:$STRAP_GITHUB_TOKEN" "https://api.github.com/user/keys" -d "{
+      \"title\": \"$STRAP_GITHUB_USER@`hostname -s`\",
+      \"key\": \"`cat $PRIVATE_KEY_PATH.pub`\"
+    }"
+
+    echo "Public key added to credentials"
 fi
-
-# # Todo: rm public key token with exact name if exists
-
-PRIVATE_KEY_PATH=github_rsa
-
-rm -f $PRIVATE_KEY_PATH $PRIVATE_KEY_PATH.pub
-
-ssh-keygen -t rsa -b 4096 -C "github.com/$STRAP_GITHUB_USER" -N "" -f ./$PRIVATE_KEY_PATH -q
-
-curl -s -u "$STRAP_GITHUB_USER:$STRAP_GITHUB_TOKEN" "https://api.github.com/user/keys" -d "{
-  \"title\": \"$STRAP_GITHUB_USER@`hostname -s`\",
-  \"key\": \"`cat $PRIVATE_KEY_PATH.pub`\"
-}"
-
-echo "Public key added to credentials"
-
-
 
 
 abort() { STRAP_STEP="";   echo "!!! $*" >&2; exit 1; }
@@ -251,6 +243,8 @@ function when_admin() {
 # Setup GitHub HTTPS credentials.
 if git credential-osxkeychain 2>&1 | grep $Q "git.credential-osxkeychain"
 then
+  logn "Configuring git https credentials:"
+
   if [ "$(git config --global credential.helper)" != "osxkeychain" ]
   then
     git config --global credential.helper osxkeychain
@@ -263,8 +257,32 @@ then
           "$STRAP_GITHUB_USER" "$STRAP_GITHUB_TOKEN" \
           | git credential-osxkeychain store
   fi
+  logk
 fi
+
+
+export GIT_SSH_COMMAND="ssh -i $PRIVATE_KEY_PATH"
+
+logn "Importing user library"
+if ! [ -d "$HOME/.library" ] ; then
+  git clone git@github.com:MeddahJ/osx-library.git "$HOME/.library"
+else
+  git -C "$HOME/.library" pull origin master
+  # TODO: implement automatic sync between library files
+fi
+rsync -a "$HOME/.library" "$HOME/Library"
 logk
+
+logn "Importing user dotfiles"
+if ! [ -d "$HOME/.dotfiles" ] ; then
+  git clone git@github.com:MeddahJ/dotfiles.git "$HOME/.dotfiles"
+else
+  git -C "$HOME/.dotfiles" pull origin master
+  # TODO: implement automatic sync between library files
+fi
+ls -A "$HOME"/.dotfiles | grep -Ev "\.git|\.DS_Store" | xargs -I _dotfile ln -f -s "$HOME/.dotfiles/_dotfile" "$HOME/_dotfile"
+logk
+
 
 if ! [[ -x `which brew` ]] ; then
     # Setup Homebrew directory and permissions.
@@ -292,32 +310,12 @@ log "Updating Homebrew:"
 brew update
 logk
 
-
-
 # Install from local Brewfile
 if [ -f "$HOME/.Brewfile" ]; then
-  log "Installing from user Brewfile on GitHub:"
+  log "Installing from local Brewfile"
   brew bundle --global
   logk
 fi
-
-if ! [ -d "$HOME/.library" ] ; then
-  git clone git@github.com:MeddahJ/osx-library.git "$HOME/.library"
-  rsync -a "$HOME/.library" "$HOME/Library"
-else
-  git pull origin master
-  # TODO: implement automatic sync between library files
-fi
-
-
-if ! [ -d "$HOME/.dotfiles" ] ; then
-  git clone git@github.com:MeddahJ/dotfiles.git "$HOME/.dotfiles"
-else
-  git pull origin master
-  # TODO: implement automatic sync between library files
-fi
-ls -d "$HOME/.dotfiles/.*" | xargs -I dotfile ln -fs dotfile $HOME/dotfile
-
 
 
 if [ $IS_ADMIN = 1 ] ; then
