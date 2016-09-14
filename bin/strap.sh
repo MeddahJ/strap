@@ -260,30 +260,6 @@ then
   logk
 fi
 
-
-export GIT_SSH_COMMAND="ssh -i $PRIVATE_KEY_PATH"
-
-logn "Importing user library"
-if ! [ -d "$HOME/.library" ] ; then
-  git clone git@github.com:MeddahJ/osx-library.git "$HOME/.library"
-else
-  git -C "$HOME/.library" pull origin master
-  # TODO: implement automatic sync between library files
-fi
-rsync -a "$HOME/.library" "$HOME/Library"
-logk
-
-logn "Importing user dotfiles"
-if ! [ -d "$HOME/.dotfiles" ] ; then
-  git clone git@github.com:MeddahJ/dotfiles.git "$HOME/.dotfiles"
-else
-  git -C "$HOME/.dotfiles" pull origin master
-  # TODO: implement automatic sync between library files
-fi
-ls -A "$HOME"/.dotfiles | grep -Ev "\.git|\.DS_Store" | xargs -I _dotfile ln -f -s "$HOME/.dotfiles/_dotfile" "$HOME/_dotfile"
-logk
-
-
 if ! [[ -x `which brew` ]] ; then
     # Setup Homebrew directory and permissions.
     logn "Installing Homebrew:"
@@ -310,13 +286,27 @@ log "Updating Homebrew:"
 brew update
 logk
 
-# Install from local Brewfile
-if [ -f "$HOME/.Brewfile" ]; then
-  log "Installing from local Brewfile"
-  brew bundle --global
-  logk
-fi
+GIT_SSH_COMMAND="ssh -i $PRIVATE_KEY_PATH"
 
+logn "Importing user dotfiles"
+DOTFILES_DIR="$HOME/.dotfiles"
+if ! [ -d $DOTFILES_DIR ] ; then
+  git clone git@github.com:MeddahJ/dotfiles.git $DOTFILES_DIR
+else
+  git -C $DOTFILES_DIR pull origin master
+fi
+$DOTFILES_DIR/setup.sh
+logk
+
+logn "Importing user library"
+if ! [ -d "$HOME/.library" ] ; then
+  git clone git@github.com:MeddahJ/osx-library.git "$HOME/.library"
+else
+  git -C "$HOME/.library" pull origin master
+  # TODO: implement automatic sync between library files
+fi
+rsync -a "$HOME/.library" "$HOME/Library"
+logk
 
 if [ $IS_ADMIN = 1 ] ; then
     # Check and install any remaining software updates.
