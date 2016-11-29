@@ -286,7 +286,8 @@ log "Updating Homebrew:"
 brew update
 logk
 
-GIT_SSH_COMMAND="ssh -i $PRIVATE_KEY_PATH"
+
+export GIT_SSH_COMMAND="ssh -i $PRIVATE_KEY_PATH"
 
 logn "Importing user dotfiles"
 DOTFILES_DIR="$HOME/.dotfiles"
