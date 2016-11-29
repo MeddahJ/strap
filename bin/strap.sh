@@ -335,5 +335,4 @@ fi
 STRAP_SUCCESS="1"
 log "Bootstrap done"
 
-
-chsh -s `which zsh`
+[[ "$SHELL" == *zsh ]] || chsh -s `which zsh`
