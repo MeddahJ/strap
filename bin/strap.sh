@@ -288,7 +288,10 @@ logk
 
 
 log "Install oh-my-zsh"
-sh -c "$(curl -fsSL https://raw.github.com/robbyrussell/oh-my-zsh/master/tools/install.sh)"
+if [ ! -d ~/.oh-my-zsh ] ;
+then
+  git clone git://github.com/robbyrussell/oh-my-zsh.git ~/.oh-my-zsh
+fi
 logk
 
 export GIT_SSH_COMMAND="ssh -i $PRIVATE_KEY_PATH"
@@ -331,3 +334,6 @@ fi
 
 STRAP_SUCCESS="1"
 log "Bootstrap done"
+
+
+chsh -s `which zsh`
