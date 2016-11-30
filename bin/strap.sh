@@ -215,6 +215,14 @@ function when_admin() {
       fi
     }
     xcode_license
+
+    # Can't chsh to a shell not in /etc/shells
+    switch_to_zsh() {
+        BREW_ZSH=/usr/local/bin/zsh
+        grep zsh /etc/shells || sudo echo "$BREW_ZSH" >> /etc/shells
+        [[ "$SHELL" == *zsh ]] || sudo chsh -s $BREW_ZSH $(whoami)
+    }
+
 }
 
 [ $IS_ADMIN = 1 ] && when_admin
@@ -335,4 +343,7 @@ fi
 STRAP_SUCCESS="1"
 log "Bootstrap done"
 
-[[ "$SHELL" == *zsh ]] || chsh -s `which zsh`
+
+# Keep that command at the bottom in case chsh is indeed executed
+switch_to_zsh
+
