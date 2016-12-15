@@ -202,6 +202,8 @@ function when_admin() {
       logk
     }
 
+    sudo pmset hibernatemode 25 
+
     # Check if the Xcode license is agreed to and agree if not.
     xcode_license() {
       if /usr/bin/xcrun clang 2>&1 | grep $Q license; then
